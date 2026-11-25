@@ -32,7 +32,7 @@
             <%= tag.option _("No template: no tools"), value: "" %>
             <% templates.each do |template| %>
               <%= tag.option template.name, value: template.id, selected: template.id == @setup.user_template_id || nil,
-                    data: { mail: template.mail? || nil } %>
+                    data: { mail: template.mail? || nil, make_mailbox: (template.mail? && template.make_mailbox?) || nil } %>
             <% end %>
           <% end %>
           <p class="help-text">
@@ -41,16 +41,26 @@
           </p>
         </div>
 
-        <%# Only a template with a mailbox asks for its login %>
+        <%# Only a template with a mailbox asks about it, and only one that exists asks for its login %>
         <fieldset class="hidden group-has-[option[data-mail]:checked]:block space-y-4 border-t border-border-light pt-4">
           <legend class="text-sm font-semibold text-text-primary"><%= _("Their mailbox") %></legend>
-          <%= render "components/form_field", label: _("Email address"), name: "user_setup[mail_address]", id: "user_setup_mail_address",
-                type: :email, value: @setup.mail_address, help: _("Leave empty when it's the address above.") %>
-          <%= render "components/form_field", label: _("Username"), name: "user_setup[mail_username]", id: "user_setup_mail_username",
-                value: @setup.mail_username, help: _("Leave empty when it's the email address.") %>
-          <%= render "components/form_field", label: _("Password"), name: "user_setup[mail_password]", id: "user_setup_mail_password",
-                type: :password, autocomplete: "new-password", object: @setup, field: :mail_password,
-                help: _("The mailbox's password. It's kept encrypted, and they never see it.") %>
+          <div class="space-y-1">
+            <%= render "components/form_field", label: _("Email address"), name: "user_setup[mail_address]", id: "user_setup_mail_address",
+                  type: :email, value: @setup.mail_address, object: @setup, field: :mail_address %>
+            <p class="help-text group-has-[option[data-make-mailbox]:checked]:hidden"><%= _("Leave empty when it's the address above.") %></p>
+            <% if MailServer.configured? %>
+              <p class="help-text hidden group-has-[option[data-make-mailbox]:checked]:block">
+                <%= _("A new mailbox at %{domain} is made for them. Leave empty for the name of the address above at %{domain}.", domain: MailServer.domain) %>
+              </p>
+            <% end %>
+          </div>
+          <div class="space-y-4 group-has-[option[data-make-mailbox]:checked]:hidden">
+            <%= render "components/form_field", label: _("Username"), name: "user_setup[mail_username]", id: "user_setup_mail_username",
+                  value: @setup.mail_username, help: _("Leave empty when it's the email address.") %>
+            <%= render "components/form_field", label: _("Password"), name: "user_setup[mail_password]", id: "user_setup_mail_password",
+                  type: :password, autocomplete: "new-password", object: @setup, field: :mail_password,
+                  help: _("The mailbox's password. It's kept encrypted, and they never see it.") %>
+          </div>
         </fieldset>
 
         <label class="flex items-center gap-3 cursor-pointer">

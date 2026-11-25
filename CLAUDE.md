@@ -22,6 +22,8 @@ Config lives in `config/initializers/app_config.rb`. View helpers: `app_name`, `
 
 Mail (IMAP/SMTP) and calendar (CalDAV) connections go through `RemoteHost.verify!`, which refuses hosts that resolve to local addresses, and private networks unless `ALLOW_PRIVATE_NETWORK_HOSTS=true`. Tests use a fake resolver (`test/test_helper.rb`): names are public, `localhost` is local, `*.internal` is private, `*.invalid` doesn't resolve.
 
+The admin console (`Admin::`, `/admin`) makes accounts from templates (`UserTemplate`, `UserSetup`). A template with `make_mailbox` makes each person a mailbox on the installation's own mail server (`MailServer`: docker-mailserver, whose `postfix-accounts.cf` the web container shares in `docker-compose.yml`; on when `MAIL_DOMAIN` and `MAILSERVER_ACCOUNTS_FILE` are set, `MAILSERVER_HOST` is its name), with a generated password, connects the person's Calendar tools to its calendar server with that login (Radicale, `MAILSERVER_CALDAV_URL`), and waits until the server takes the login before the first syncs (a refused login would hold them back an hour). Tests use `with_mail_server`. A person's page in the console lists their tools by when they last opened them (`collaborators.last_seen_at`, in use within `Collaborator::ACTIVE_WITHIN`).
+
 ## Development Commands
 
 ```bash

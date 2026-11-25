@@ -2,6 +2,8 @@
 
 class Collaborator < ApplicationRecord
   ROLES = %w[owner collaborator].freeze
+  # Someone who opened a tool within this long is using it (the admin console says so)
+  ACTIVE_WITHIN = 30.days
 
   belongs_to :tool
   belongs_to :user
@@ -18,8 +20,10 @@ class Collaborator < ApplicationRecord
   scope :owners, -> { where(role: "owner") }
   scope :muted, -> { where.not(muted_at: nil) }
   scope :unmuted, -> { where(muted_at: nil) }
+  scope :active, -> { where(last_seen_at: ACTIVE_WITHIN.ago..) }
 
   def muted? = muted_at.present?
+  def active? = last_seen_at.present? && last_seen_at > ACTIVE_WITHIN.ago
 
   def mute!
     update!(muted_at: Time.current)

@@ -32,46 +32,67 @@
     <legend class="text-sm font-semibold text-text-primary mb-1"><%= _("Their mailbox") %></legend>
     <label class="flex items-center gap-3 cursor-pointer">
       <%= f.check_box :mail, class: check_class %>
-      <span class="text-sm text-text-primary"><%= _("A Mail tool on their own mailbox, on these servers") %></span>
+      <span class="text-sm text-text-primary"><%= _("A Mail tool on their own mailbox") %></span>
     </label>
-    <p class="help-text"><%= _("Their username and password are asked for when you make each account.") %></p>
 
     <div class="hidden group-has-[#user_template_mail:checked]:block space-y-4">
       <%= render "components/form_field", label: _("Name"), name: "user_template[mail_tool_name]", id: "user_template_mail_tool_name",
             value: template.mail_tool_name, placeholder: _("Mail") %>
 
-      <h3 class="text-sm font-semibold text-text-primary"><%= _("Incoming mail (IMAP)") %></h3>
-      <div class="grid grid-cols-3 gap-4">
-        <div class="col-span-2">
-          <%= render "components/form_field", label: _("IMAP server"), name: "user_template[mail_imap_host]", id: "user_template_mail_imap_host",
-                value: template.mail_imap_host, placeholder: "imap.example.com", object: template, field: :mail_imap_host %>
-        </div>
-        <%= render "components/form_field", label: _("Port"), name: "user_template[mail_imap_port]", id: "user_template_mail_imap_port",
-              type: :number, value: template.mail_imap_port %>
-      </div>
-      <label class="flex items-center gap-3 cursor-pointer">
-        <%= f.check_box :mail_imap_ssl, class: check_class %>
-        <span class="text-sm text-text-primary"><%= _("Use SSL/TLS") %></span>
-      </label>
-
-      <h3 class="text-sm font-semibold text-text-primary"><%= _("Outgoing mail (SMTP)") %></h3>
-      <div class="grid grid-cols-3 gap-4">
-        <div class="col-span-2">
-          <%= render "components/form_field", label: _("SMTP server"), name: "user_template[mail_smtp_host]", id: "user_template_mail_smtp_host",
-                value: template.mail_smtp_host, placeholder: "smtp.example.com", object: template, field: :mail_smtp_host %>
-        </div>
-        <%= render "components/form_field", label: _("Port"), name: "user_template[mail_smtp_port]", id: "user_template_mail_smtp_port",
-              type: :number, value: template.mail_smtp_port %>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <%= render "components/form_field", label: _("Authentication"), name: "user_template[mail_smtp_auth]", id: "user_template_mail_smtp_auth",
-              type: :select, value: template.mail_smtp_auth,
-              options: [ [ _("Plain"), "plain" ], [ _("Login"), "login" ], [ "CRAM-MD5", "cram_md5" ] ] %>
-        <div class="flex items-end pb-2">
+      <% if MailServer.configured? || template.make_mailbox? %>
+        <div class="space-y-1">
           <label class="flex items-center gap-3 cursor-pointer">
-            <%= f.check_box :mail_smtp_tls, class: check_class %>
-            <span class="text-sm text-text-primary"><%= _("Use STARTTLS") %></span>
+            <%= f.check_box :make_mailbox, class: check_class %>
+            <span class="text-sm text-text-primary"><%= _("Make a new mailbox for each person on this installation's mail server") %></span>
           </label>
+          <p class="help-text">
+            <%= MailServer.configured? ?
+                  _("Their address is at %{domain}, and its password is made for them and kept encrypted.", domain: MailServer.domain) :
+                  _("This installation has no mail server to make mailboxes on.") %>
+          </p>
+          <% if MailServer.calendar? %>
+            <p class="help-text"><%= _("A Calendar tool among their tools is connected to the calendar server with the same login.") %></p>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%# The servers of mailboxes that exist; one made here is on the installation's own %>
+      <div class="space-y-4 group-has-[#user_template_make_mailbox:checked]:hidden">
+        <p class="help-text"><%= _("On these servers. Their username and password are asked for when you make each account.") %></p>
+
+        <h3 class="text-sm font-semibold text-text-primary"><%= _("Incoming mail (IMAP)") %></h3>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="col-span-2">
+            <%= render "components/form_field", label: _("IMAP server"), name: "user_template[mail_imap_host]", id: "user_template_mail_imap_host",
+                  value: template.mail_imap_host, placeholder: "imap.example.com", object: template, field: :mail_imap_host %>
+          </div>
+          <%= render "components/form_field", label: _("Port"), name: "user_template[mail_imap_port]", id: "user_template_mail_imap_port",
+                type: :number, value: template.mail_imap_port %>
+        </div>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <%= f.check_box :mail_imap_ssl, class: check_class %>
+          <span class="text-sm text-text-primary"><%= _("Use SSL/TLS") %></span>
+        </label>
+
+        <h3 class="text-sm font-semibold text-text-primary"><%= _("Outgoing mail (SMTP)") %></h3>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="col-span-2">
+            <%= render "components/form_field", label: _("SMTP server"), name: "user_template[mail_smtp_host]", id: "user_template_mail_smtp_host",
+                  value: template.mail_smtp_host, placeholder: "smtp.example.com", object: template, field: :mail_smtp_host %>
+          </div>
+          <%= render "components/form_field", label: _("Port"), name: "user_template[mail_smtp_port]", id: "user_template_mail_smtp_port",
+                type: :number, value: template.mail_smtp_port %>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <%= render "components/form_field", label: _("Authentication"), name: "user_template[mail_smtp_auth]", id: "user_template_mail_smtp_auth",
+                type: :select, value: template.mail_smtp_auth,
+                options: [ [ _("Plain"), "plain" ], [ _("Login"), "login" ], [ "CRAM-MD5", "cram_md5" ] ] %>
+          <div class="flex items-end pb-2">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <%= f.check_box :mail_smtp_tls, class: check_class %>
+              <span class="text-sm text-text-primary"><%= _("Use STARTTLS") %></span>
+            </label>
+          </div>
         </div>
       </div>
     </div>

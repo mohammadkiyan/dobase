@@ -98,6 +98,142 @@ module Admin
       assert_select ".flash-error", text: /The mailbox couldn't be connected/
     end
 
+    test "a template that makes the mailbox adds it to the mail server and connects it" do
+      with_mail_server do |file|
+        @template.update!(mail: true, make_mailbox: true, mail_tool_name: "Work mail")
+        imap = FakeImapServer.new
+
+        assert_enqueued_jobs 1, only: SyncEmailsJob do
+          with_mail_servers(imap: imap) do
+            post admin_users_path, params: { user_setup: { first_name: "Ann", last_name: "Lee", email_address: "ann.lee@example.com",
+              user_template_id: @template.id, mail_password: "ignored" } }
+          end
+        end
+
+        ann = User.find_by!(email_address: "ann.lee@example.com")
+        assert_redirected_to admin_user_path(ann)
+        account = ann.owned_tools.find_by!(name: "Work mail").mail_account
+        assert_equal "ann.lee@dobase.test", account.email_address
+        assert_equal "ann.lee@dobase.test", account.username
+        assert_equal [ "mailserver", 143, false, "mailserver", 587, false ],
+          account.slice(:imap_host, :imap_port, :imap_ssl, :smtp_host, :smtp_port, :smtp_tls).values
+        assert_not_equal "ignored", account.password
+
+        address, hash = File.read(file).chomp.split("|{SHA512-CRYPT}")
+        assert_equal "ann.lee@dobase.test", address
+        assert_equal hash, account.password.crypt(hash)
+        assert_equal [ [ "ann.lee@dobase.test", account.password ] ], imap.tried_logins.uniq
+      end
+    end
+
+    test "a Calendar tool of a mailbox made here is on the calendar server, with the mailbox's login" do
+      with_mail_server(caldav_url: "http://calendar:5232/") do
+        @template.update!(mail: true, make_mailbox: true, chosen_tools: { "calendar" => { on: "1", name: "Plans" } })
+
+        assert_enqueued_with(job: SyncCalendarsJob) do
+          with_mail_servers do
+            post admin_users_path, params: { user_setup: { first_name: "Ann", last_name: "Lee", email_address: "ann@example.com", user_template_id: @template.id } }
+          end
+        end
+
+        ann = User.find_by!(email_address: "ann@example.com")
+        mailbox = ann.owned_tools.joins(:tool_type).find_by!(tool_types: { slug: "mail" }).mail_account
+        calendar = ann.owned_tools.find_by!(name: "Plans").calendar_account
+        assert_equal [ "custom", "http://calendar:5232/", "ann@dobase.test" ], [ calendar.provider, calendar.caldav_url, calendar.username ]
+        assert_equal mailbox.password, calendar.password
+        assert_enqueued_with(job: SyncCalendarsJob, args: [ calendar.id, { discover: true } ])
+      end
+    end
+
+    test "without a calendar server, a Calendar tool is left for them to set up" do
+      with_mail_server do
+        @template.update!(mail: true, make_mailbox: true, chosen_tools: { "calendar" => { on: "1" } })
+
+        assert_no_enqueued_jobs only: SyncCalendarsJob do
+          with_mail_servers do
+            post admin_users_path, params: { user_setup: { first_name: "Ann", last_name: "Lee", email_address: "ann@example.com", user_template_id: @template.id } }
+          end
+        end
+
+        assert_nil User.find_by!(email_address: "ann@example.com").owned_tools.find_by!(name: "Calendar").calendar_account
+      end
+    end
+
+    test "a mailbox made here is the person's own address when it is at the domain, or the one given" do
+      with_mail_server do
+        @template.update!(mail: true, make_mailbox: true)
+
+        with_mail_servers do
+          post admin_users_path, params: { user_setup: { first_name: "Ann", last_name: "Lee", email_address: "ann@dobase.test", user_template_id: @template.id } }
+          post admin_users_path, params: { user_setup: { first_name: "Bo", last_name: "Ng", email_address: "bo@example.com",
+            mail_address: "bo.ng@dobase.test", user_template_id: @template.id } }
+        end
+
+        assert MailServer.mailbox?("ann@dobase.test")
+        assert MailServer.mailbox?("bo.ng@dobase.test")
+      end
+    end
+
+    test "a mailbox that is taken, or at another domain, makes nothing" do
+      with_mail_server do |file|
+        @template.update!(mail: true, make_mailbox: true)
+        MailServer.add_mailbox!("ann@dobase.test", "theirs")
+
+        assert_no_difference -> { User.count } do
+          post admin_users_path, params: { user_setup: { first_name: "Ann", last_name: "Lee", email_address: "ann@example.com", user_template_id: @template.id } }
+          post admin_users_path, params: { user_setup: { first_name: "Ann", last_name: "Lee", email_address: "ann@example.com",
+            mail_address: "ann@elsewhere.com", user_template_id: @template.id } }
+        end
+
+        assert_response :unprocessable_entity
+        assert_select ".error-text", text: "must be an address at dobase.test"
+        assert_equal 1, File.readlines(file).size
+      end
+    end
+
+    test "nothing is made when the mail server's account file can't be written" do
+      with_mail_server do
+        @template.update!(mail: true, make_mailbox: true)
+        Rails.application.config.x.mail_server.accounts_file = "/nonexistent/postfix-accounts.cf"
+
+        assert_no_difference [ -> { User.count }, -> { Tool.count }, -> { Mails::Account.count } ] do
+          post admin_users_path, params: { user_setup: { first_name: "Ann", last_name: "Lee", email_address: "ann@example.com", user_template_id: @template.id } }
+        end
+
+        assert_response :unprocessable_entity
+        assert_select ".flash-error", text: /The mailbox couldn't be made/
+      end
+    end
+
+    test "a person's page says which of their tools they use, and when they last opened each" do
+      memberships = Collaborator.where(user: users(:two)).includes(:tool).order(:id).to_a
+      assert memberships.many?
+      memberships.each { |membership| membership.update_column(:last_seen_at, nil) }
+      used = memberships.last
+      used.update_column(:last_seen_at, 2.hours.ago)
+
+      get admin_user_path(users(:two))
+
+      assert_response :success
+      rows = css_select("li").select { |row| memberships.any? { |membership| row.text.include?(membership.tool.name) } }
+      assert_equal memberships.size, rows.size
+      assert_equal used.tool.name, rows.first.at_css("p").text.strip, "the tool used last comes first"
+      assert_match "In use", rows.first.text
+      assert_match "Opened about 2 hours ago", rows.first.text
+      assert rows.drop(1).all? { |row| row.text.include?("Never opened") && row.text.exclude?("In use") }
+    end
+
+    test "the console says how many tools each person uses" do
+      Collaborator.where(user: users(:two)).update_all(last_seen_at: nil)
+      Collaborator.where(user: users(:two)).first.update!(last_seen_at: 1.day.ago)
+      count = Collaborator.where(user: users(:two)).count
+
+      get admin_users_path
+
+      assert_match "1 of #{count} tools in use", response.body
+      assert_match "Active 1 day ago", response.body
+    end
+
     test "an address someone already has is refused" do
       assert_no_difference -> { User.count } do
         post admin_users_path, params: { user_setup: { first_name: "Ann", last_name: "Lee", email_address: users(:two).email_address } }

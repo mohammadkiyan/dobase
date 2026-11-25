@@ -22,6 +22,15 @@ services:
       # The mail and calendar servers below are on this private network, which
       # Dobase refuses unless told otherwise
       - ALLOW_PRIVATE_NETWORK_HOSTS=${ALLOW_PRIVATE_NETWORK_HOSTS:-true}
+      # The admin console makes each new person a mailbox at MAIL_DOMAIN on the mail
+      # server below (a template with "Make a new mailbox"), by adding it to the
+      # server's account file, which the two share. Put MAILSERVER_ACCOUNTS_FILE=
+      # (empty) in .env to make mailboxes by hand instead. A Calendar tool of theirs
+      # is connected to the calendar server below with the mailbox's login.
+      - MAIL_DOMAIN=${MAIL_DOMAIN:-dobase.test}
+      - MAILSERVER_HOST=mailserver
+      - MAILSERVER_ACCOUNTS_FILE=${MAILSERVER_ACCOUNTS_FILE-/mailserver/postfix-accounts.cf}
+      - MAILSERVER_CALDAV_URL=${MAILSERVER_CALDAV_URL-http://calendar:5232/}
       # Optional: uncomment to enable the Room (video) tool.
       # LIVEKIT_URL must be the public URL browsers connect to.
       # - LIVEKIT_URL=wss://room.your-domain.com
@@ -29,10 +38,12 @@ services:
       # - LIVEKIT_API_SECRET=devsecret
     volumes:
       - storage:/rails/storage
+      - mail-config:/mailserver
     restart: unless-stopped
 
   # Mail server: Postfix (SMTP) and Dovecot (IMAP), by docker-mailserver.
-  # A mailbox is made with:
+  # The admin console makes a mailbox for each person it makes (see web above).
+  # By hand, a mailbox is made with:
   #   docker compose exec mailserver setup email add ann@your-domain.com 'password'
   # In Dobase's Mail tool (or an admin template) it is:
   #   IMAP mailserver, port 143, SSL off   SMTP mailserver, port 587, PLAIN, TLS off
@@ -51,7 +62,9 @@ services:
     # Before the server starts: the mailbox Dobase sends its own mail from, when
     # NOTIFICATIONS_MAIL_PASSWORD is given. The server won't start without any
     # mailbox, so without one the first start makes postmaster@<domain>, whose
-    # password is written to the log once.
+    # password is written to the log once. Then the account file is handed to
+    # Dobase's user (uid 1000), which adds the mailboxes the admin console makes;
+    # the server reads the file again every few seconds.
     entrypoint:
       - /bin/bash
       - -c
@@ -65,6 +78,8 @@ services:
           setup email add "postmaster@$${MAIL_DOMAIN}" "$${password}"
           echo "Made postmaster@$${MAIL_DOMAIN} with the password $${password}"
         fi
+        chown 1000:1000 "$${accounts}"
+        chmod 640 "$${accounts}"
         exec /usr/bin/dumb-init -- "$$@"
       - --
     command: ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]

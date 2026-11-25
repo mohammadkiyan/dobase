@@ -144,11 +144,13 @@ MAIL_DOMAIN=your-domain.com
 NOTIFICATIONS_MAIL_PASSWORD=<a password>   # Dobase sends its own mail as notifications@your-domain.com
 ```
 
+The admin console makes the mailboxes: in a template, tick "A Mail tool on their own mailbox" and "Make a new mailbox for each person on this installation's mail server". Each person made from it gets a mailbox at `MAIL_DOMAIN` (their own address when it is at that domain, else its name there, or the address you type) and a Mail tool already connected to it. Its password is made for them and kept encrypted. A Calendar tool the template gives them is connected to the calendar server with the same login (`MAILSERVER_CALDAV_URL`; empty leaves it for them to set up). Dobase adds the mailbox to the mail server's account file, which the two containers share (`MAILSERVER_ACCOUNTS_FILE`); put `MAILSERVER_ACCOUNTS_FILE=` (empty) in `.env` to turn that off. By hand, a mailbox is made with:
+
 ```bash
 docker compose exec mailserver setup email add ann@your-domain.com 'her password'
 ```
 
-That mailbox is also a calendar account with the same login. In Dobase:
+A mailbox made by hand is also a calendar account with the same login. In Dobase:
 
 | Tool | Settings |
 |------|----------|

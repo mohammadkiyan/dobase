@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_25_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_25_120000) do
   create_table "access_tokens", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "last_used_at"
@@ -741,6 +741,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_25_100000) do
     t.boolean "mail_smtp_tls", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "make_mailbox", default: false, null: false
   end
 
   create_table "users", force: :cascade do |t|

@@ -1,6 +1,29 @@
 {
   "ignored_warnings": [
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "a65bbb1e7bfaddd993015903086177aa4f99a7cdd18f88812319fdb3fd9c8644",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/admin/users_controller.rb",
+      "line": 74,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.require(:user_setup).permit(:first_name, :last_name, :email_address, :admin, :user_template_id, :mail_address, :mail_username, :mail_password)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::UsersController",
+        "method": "setup_params"
+      },
+      "user_input": ":admin",
+      "confidence": "High",
+      "cwe_id": [
+        915
+      ],
+      "note": "The admin console's form for a new account: only an admin reaches Admin::UsersController (Admin::BaseController), and choosing whether the new person is an admin is what the field is for."
+    }
   ],
-  "updated": "2026-09-18",
+  "updated": "2026-11-25",
   "brakeman_version": "8.0.6"
 }

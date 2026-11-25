@@ -15,6 +15,15 @@
             <%= link_to user.name, admin_user_path(user), class: "font-medium text-text-primary hover:text-accent after:absolute after:inset-0" %>
             <p class="text-sm text-text-secondary truncate"><%= user.email_address %></p>
           </div>
+          <div class="text-sm text-end flex-shrink-0 max-sm:hidden">
+            <p class="text-text-secondary">
+              <%= n_("%{active} of %{count} tool in use", "%{active} of %{count} tools in use", @tool_counts.fetch(user.id, 0),
+                    active: @active_tool_counts.fetch(user.id, 0)) %>
+            </p>
+            <p class="text-text-tertiary">
+              <%= @last_active[user.id] ? _("Active %{time}", time: ago(@last_active[user.id])) : _("Never opened a tool") %>
+            </p>
+          </div>
           <% if user.welcome_pending? %>
             <%= render "components/badge", text: _("Not signed in yet"), variant: :warning, size: :sm %>
           <% end %>

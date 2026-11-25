@@ -1,14 +1,17 @@
 # frozen_string_literal: true
 
 # What an account an admin makes starts with: tools of its own, a Mail tool on its
-# own mailbox (on the servers named here, with the login given when the account is
-# made), and tools of the admin's it joins as a collaborator.
+# own mailbox, and tools of the admin's it joins as a collaborator. The mailbox is
+# made for it on this installation's mail server (make_mailbox, MailServer), or is
+# one that exists on the servers named here, with the login given when the account
+# is made.
 class UserTemplate < ApplicationRecord
   # Mail is a tool of its own here: it needs a mailbox to be of use
   OWN_TOOL_TYPES = %w[todos boards docs files chat calendar room].freeze
 
   validates :name, presence: true
-  validates :mail_imap_host, :mail_smtp_host, presence: true, if: :mail?
+  validates :mail_imap_host, :mail_smtp_host, presence: true, if: -> { mail? && !make_mailbox? }
+  validate :mail_server_configured, if: -> { mail? && make_mailbox? }
   validates :mail_smtp_auth, inclusion: { in: Mails::Account::SMTP_AUTH_METHODS }
   validate :tools_are_known
 
@@ -28,7 +31,10 @@ class UserTemplate < ApplicationRecord
     Tool.where(id: shared_tool_ids).includes(:tool_type).order(:name)
   end
 
+  # A mailbox made on this installation's mail server is reached the way that server says
   def mail_server_settings
+    return MailServer.settings if make_mailbox?
+
     {
       imap_host: mail_imap_host, imap_port: mail_imap_port, imap_ssl: mail_imap_ssl,
       smtp_host: mail_smtp_host, smtp_port: mail_smtp_port, smtp_auth: mail_smtp_auth, smtp_tls: mail_smtp_tls
@@ -52,6 +58,10 @@ class UserTemplate < ApplicationRecord
     self.shared_tool_ids = Array(shared_tool_ids).compact_blank.map(&:to_i).uniq
     self.mail_imap_host = mail_imap_host.to_s.strip.presence
     self.mail_smtp_host = mail_smtp_host.to_s.strip.presence
+  end
+
+  def mail_server_configured
+    errors.add(:base, _("This installation has no mail server to make mailboxes on.")) unless MailServer.configured?
   end
 
   def tools_are_known

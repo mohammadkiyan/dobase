@@ -11,7 +11,8 @@ module Admin
     end
 
     def new
-      @template = UserTemplate.new
+      # A mailbox of their own on the installation's mail server, when there is one
+      @template = UserTemplate.new(mail: MailServer.configured?, make_mailbox: MailServer.configured?)
     end
 
     def create
@@ -48,7 +49,7 @@ module Admin
 
     def template_params
       params.require(:user_template).permit(
-        :name, :mail, :mail_tool_name,
+        :name, :mail, :mail_tool_name, :make_mailbox,
         :mail_imap_host, :mail_imap_port, :mail_imap_ssl,
         :mail_smtp_host, :mail_smtp_port, :mail_smtp_auth, :mail_smtp_tls,
         shared_tool_ids: [],

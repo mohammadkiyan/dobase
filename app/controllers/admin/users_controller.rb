@@ -9,11 +9,18 @@ module Admin
 
     def index
       @users = User.order(:first_name, :last_name, :id)
+      # How many tools each person is on, how many of them they use, and when they last opened one
+      @tool_counts = Collaborator.group(:user_id).count
+      @active_tool_counts = Collaborator.active.group(:user_id).count
+      @last_active = Collaborator.group(:user_id).maximum(:last_seen_at)
     end
 
+    # The tools someone is on, the ones they use first
     def show
       @welcome_link = welcome_url(@user.generate_token_for(:welcome)) if @user.welcome_pending?
-      @tools = @user.accessible_tools.includes(:tool_type).order(:name)
+      @memberships = Collaborator.where(user: @user).joins(:tool).includes(tool: %i[tool_type mail_account])
+        .order(Arel.sql("collaborators.last_seen_at IS NULL"), last_seen_at: :desc).order("tools.name")
+      @people_counts = Collaborator.where(tool_id: @memberships.map(&:tool_id)).group(:tool_id).count
     end
 
     def new
@@ -29,6 +36,10 @@ module Admin
         if @setup.skipped_tools.any?
           notice += " " + _("Not added to %{tools}: only an owner of a tool can add someone to it.",
             tools: @setup.skipped_tools.map(&:name).to_sentence)
+        end
+        if @setup.mailbox_waiting?
+          notice += " " + _("The mail server hasn't taken the new mailbox %{address} yet: its mail shows once it has.",
+            address: @setup.mailbox_address)
         end
         redirect_to admin_user_path(@setup.user), notice: notice
       else

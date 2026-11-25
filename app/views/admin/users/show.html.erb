@@ -36,14 +36,40 @@
 
   <div class="card">
     <div class="card-body">
-      <h2 class="font-semibold text-text-primary mb-3"><%= _("Tools") %></h2>
-      <% if @tools.any? %>
-        <ul class="space-y-2">
-          <% @tools.each do |tool| %>
-            <li class="flex items-center gap-3 text-sm">
-              <%= render "shared/icon", name: tool.tool_type.icon, size: 16, class: "text-accent" %>
-              <span class="flex-1 text-text-primary"><%= tool.name %></span>
-              <span class="text-text-tertiary"><%= tool.owned_by?(@user) ? _("Owner") : _("Collaborator") %></span>
+      <div class="flex items-baseline justify-between gap-4 mb-1">
+        <h2 class="font-semibold text-text-primary"><%= _("Tools") %></h2>
+        <% if @memberships.any? %>
+          <span class="text-sm text-text-secondary">
+            <%= n_("%{active} of %{count} tool in use", "%{active} of %{count} tools in use", @memberships.size,
+                  active: @memberships.count(&:active?)) %>
+          </span>
+        <% end %>
+      </div>
+      <p class="help-text mb-3"><%= n_("In use: opened in the last %{count} day.", "In use: opened in the last %{count} days.",
+                                       Collaborator::ACTIVE_WITHIN.in_days.to_i) %></p>
+      <% if @memberships.any? %>
+        <ul class="divide-y divide-border-light">
+          <% @memberships.each do |membership| %>
+            <% tool = membership.tool %>
+            <li class="flex items-center gap-3 py-3 text-sm">
+              <%= render "shared/icon", name: tool.tool_type.icon, size: 16, class: "text-accent flex-shrink-0" %>
+              <div class="flex-1 min-w-0">
+                <p class="text-text-primary truncate"><%= tool.name %></p>
+                <p class="text-text-tertiary truncate">
+                  <%= [ tool.tool_type.human_name,
+                        (tool.mail_account.email_address if tool.mail_account),
+                        membership.role == "owner" ? _("Owner") : _("Collaborator"),
+                        n_("%{count} person", "%{count} people", @people_counts.fetch(tool.id, 0)) ].compact.join(" · ") %>
+                </p>
+              </div>
+              <div class="text-end flex-shrink-0">
+                <% if membership.active? %>
+                  <%= render "components/badge", text: _("In use"), variant: :success, size: :sm %>
+                <% end %>
+                <p class="text-text-tertiary">
+                  <%= membership.last_seen_at ? _("Opened %{time}", time: ago(membership.last_seen_at)) : _("Never opened") %>
+                </p>
+              </div>
             </li>
           <% end %>
         </ul>
