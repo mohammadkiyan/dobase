@@ -1,0 +1,68 @@
+<% content_for :title, _("%{name} - %{app_name}", name: @user.name, app_name: app_name) %>
+<% content_for :page_title, @user.name %>
+
+<div class="p-6 max-w-3xl space-y-6">
+  <%= render "components/back_link", href: admin_users_path, text: _("People") %>
+
+  <div class="flex items-center gap-4">
+    <%= render "shared/avatar", user: @user, size: :lg %>
+    <div class="flex-1 min-w-0">
+      <h1 class="text-xl font-semibold text-text-primary"><%= @user.name %></h1>
+      <p class="text-text-secondary truncate"><%= @user.email_address %></p>
+    </div>
+    <% if @user.admin? %>
+      <%= render "components/badge", text: _("Admin"), variant: :muted %>
+    <% end %>
+  </div>
+
+  <% if @welcome_link %>
+    <div class="card">
+      <div class="card-body space-y-3">
+        <h2 class="font-semibold text-text-primary"><%= _("Welcome link") %></h2>
+        <p class="text-sm text-text-secondary">
+          <%= _("Send this link to %{name}. With it they choose a password and sign in. It works once, until %{date}.",
+                name: @user.first_name, date: format_date(User::WELCOME_LINK_LIFETIME.from_now)) %>
+        </p>
+        <div class="flex gap-2" data-controller="clipboard">
+          <input type="text" readonly aria-label="<%= _("Welcome link") %>" value="<%= @welcome_link %>" class="input flex-1" dir="ltr" data-clipboard-target="source">
+          <%= render "components/button", text: _("Copy"), variant: :secondary, size: :sm, type: :button, data: { action: "clipboard#copy", clipboard_target: "button" } %>
+        </div>
+        <p class="text-xs text-text-tertiary"><%= _("Every visit to this page makes a new link; the earlier ones keep working until a password is chosen.") %></p>
+      </div>
+    </div>
+  <% else %>
+    <p class="text-sm text-text-secondary"><%= _("%{name} has chosen a password. If they forget it, they can reset it from the sign-in page.", name: @user.first_name) %></p>
+  <% end %>
+
+  <div class="card">
+    <div class="card-body">
+      <h2 class="font-semibold text-text-primary mb-3"><%= _("Tools") %></h2>
+      <% if @tools.any? %>
+        <ul class="space-y-2">
+          <% @tools.each do |tool| %>
+            <li class="flex items-center gap-3 text-sm">
+              <%= render "shared/icon", name: tool.tool_type.icon, size: 16, class: "text-accent" %>
+              <span class="flex-1 text-text-primary"><%= tool.name %></span>
+              <span class="text-text-tertiary"><%= tool.owned_by?(@user) ? _("Owner") : _("Collaborator") %></span>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="text-sm text-text-secondary"><%= _("No tools yet") %></p>
+      <% end %>
+    </div>
+  </div>
+
+  <% unless @user == current_user %>
+    <div class="flex flex-wrap items-center gap-3">
+      <%= form_with model: @user, url: admin_user_path(@user), method: :patch do |f| %>
+        <%= hidden_field_tag "user[admin]", @user.admin? ? "0" : "1", id: nil %>
+        <%= render "components/button", variant: :secondary, icon: "shield",
+              text: @user.admin? ? _("No longer an admin") : _("Make an admin") %>
+      <% end %>
+      <%= render "components/button", text: _("Delete account"), variant: :danger, icon: "trash-2",
+            href: admin_user_path(@user), method: :delete,
+            turbo_confirm: _("Delete %{name}'s account? The tools only they own are deleted with it.", name: @user.name) %>
+    </div>
+  <% end %>
+</div>

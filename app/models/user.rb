@@ -37,6 +37,20 @@ class User < ApplicationRecord
   validates :first_name, :last_name, presence: true
   validates :locale, inclusion: { in: Translation.locales }, allow_nil: true
 
+  # Whoever sets up an installation is its admin, and can make others admins
+  before_create { self.admin = true unless User.exists? }
+  # The welcome link is used up once a password is chosen, through it or any other way
+  before_update { self.welcome_pending = false if will_save_change_to_password_digest? }
+
+  scope :admins, -> { where(admin: true) }
+
+  # What an admin hands someone whose account they made: it lets them choose a
+  # password, once, within a week
+  WELCOME_LINK_LIFETIME = 7.days
+  generates_token_for :welcome, expires_in: WELCOME_LINK_LIFETIME do
+    welcome_pending? && password_salt.last(10)
+  end
+
   def name = "#{first_name} #{last_name}".strip
 
   # The colours this person sees the app in: a palette of their own, a built-in

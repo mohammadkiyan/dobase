@@ -1,0 +1,14 @@
+<%# The top of every page of the admin console: what it is, and its two parts %>
+<div class="flex items-center justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-xl font-semibold text-text-primary"><%= _("Admin") %></h1>
+    <p class="text-text-secondary"><%= _("Make accounts for your people, with the tools they start with.") %></p>
+  </div>
+  <%= yield %>
+</div>
+<div class="mb-6">
+  <%= render "components/tabs", tabs: [
+        { label: _("People"), href: admin_users_path, active: controller_name == "users", icon: "users" },
+        { label: _("Templates"), href: admin_user_templates_path, active: controller_name == "user_templates", icon: "layout" }
+      ] %>
+</div>

@@ -1,0 +1,18 @@
+<% content_for :title, _("%{name} - %{app_name}", name: @template.name, app_name: app_name) %>
+<% content_for :page_title, @template.name %>
+
+<div class="p-6 max-w-2xl space-y-6">
+  <%= render "components/back_link", href: admin_user_templates_path, text: _("Templates") %>
+  <div class="flex items-center justify-between gap-4">
+    <h1 class="text-xl font-semibold text-text-primary"><%= @template.name %></h1>
+    <%= render "components/button", text: _("Delete"), variant: :danger, size: :sm, icon: "trash-2",
+          href: admin_user_template_path(@template), method: :delete,
+          turbo_confirm: _("Delete %{name}?", name: @template.name) %>
+  </div>
+  <p class="text-sm text-text-secondary"><%= _("Changes apply to accounts made from now on, not to those already made.") %></p>
+  <div class="card">
+    <div class="card-body">
+      <%= render "admin/user_templates/form", template: @template %>
+    </div>
+  </div>
+</div>

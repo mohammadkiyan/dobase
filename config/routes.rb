@@ -18,6 +18,15 @@ Rails.application.routes.draw do
   get "signup", to: "registrations#new"
   post "signup", to: "registrations#create"
   get "altcha/challenge", to: "altcha#challenge"
+  # The link someone whose account an admin made chooses their password by
+  resources :welcomes, only: %i[show update], param: :token, path: "welcome"
+
+  # Accounts made by an admin, and the templates of tools they start with
+  namespace :admin do
+    root to: redirect("/admin/users")
+    resources :users, only: %i[index show new create update destroy]
+    resources :user_templates, except: :show, path: "templates"
+  end
 
   # A throwaway workspace for visitors of a demo instance (DEMO_MODE=true)
   resource :demo, only: :create

@@ -231,6 +231,12 @@
         <%= render "shared/icon", name: "user", size: 16 %>
         <span><%= _("Profile") %></span>
       </button>
+      <% if current_user.admin? %>
+        <%= link_to admin_users_path, class: "dropdown-item flex items-center gap-2" do %>
+          <%= render "shared/icon", name: "shield", size: 16 %>
+          <span><%= _("Admin") %></span>
+        <% end %>
+      <% end %>
       <div class="dropdown-divider"></div>
       <%= button_to logout_path, method: :delete, class: "dropdown-item flex items-center gap-2 text-error" do %>
         <%= render "shared/icon", name: "log-out", size: 16 %>

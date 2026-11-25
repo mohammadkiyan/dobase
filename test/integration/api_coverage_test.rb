@@ -20,13 +20,14 @@ class ApiCoverageTest < ActiveSupport::TestCase
     passwords#edit
     two_factor_challenges#new
     invitation_acceptances#show
+    welcomes#show
     demo/joins#show
     tools/files/shares#show
     tools/files/shares/files#show
   ].freeze
 
-  # An account, the passwords of mail and calendar accounts, and saying yes to a
-  # program that asks for a token: never a token's
+  # An account, the passwords of mail and calendar accounts, saying yes to a
+  # program that asks for a token, and the admin console (accounts of others): never a token's
   # (CLAUDE.md, "JSON API & CLI")
   NEVER_A_TOKENS = %w[
     profiles#edit
@@ -36,6 +37,12 @@ class ApiCoverageTest < ActiveSupport::TestCase
     tools/calendars/accounts#edit
     oauth/authorizations#new
     oauth/devices#new
+    admin/users#index
+    admin/users#show
+    admin/users#new
+    admin/user_templates#index
+    admin/user_templates#new
+    admin/user_templates#edit
   ].freeze
 
   # About the window a browser has open: where it goes when it opens the app, how its

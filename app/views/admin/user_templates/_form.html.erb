@@ -1,0 +1,106 @@
+<%# What a new account made from this template starts with %>
+<% kinds = ToolType.enabled.where(slug: UserTemplate::OWN_TOOL_TYPES).index_by(&:slug).values_at(*UserTemplate::OWN_TOOL_TYPES).compact %>
+<% my_tools = Tool.where(id: Collaborator.owners.where(user: current_user).select(:tool_id)).includes(:tool_type).order(:name) %>
+<% check_class = "w-4 h-4 rounded border-border text-accent focus:ring-accent/20" %>
+
+<%= form_with model: template, url: (template.persisted? ? admin_user_template_path(template) : admin_user_templates_path), class: "group space-y-6" do |f| %>
+  <%= render "shared/error_flash", object: template %>
+
+  <%= render "components/form_field", label: _("Name"), name: "user_template[name]", id: "user_template_name",
+        value: template.name, required: true, autofocus: true, placeholder: _("Sales team"), object: template, field: :name %>
+
+  <fieldset class="space-y-3">
+    <legend class="text-sm font-semibold text-text-primary mb-1"><%= _("Their own tools") %></legend>
+    <p class="help-text"><%= _("Each new person gets these, as the owner. A name left empty is the kind of tool's name.") %></p>
+    <% kinds.each do |kind| %>
+      <% chosen = template.own_tool(kind.slug) %>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-3 cursor-pointer w-40 shrink-0">
+          <%= hidden_field_tag "user_template[chosen_tools][#{kind.slug}][on]", "0", id: nil %>
+          <%= check_box_tag "user_template[chosen_tools][#{kind.slug}][on]", "1", chosen.present?, id: "user_template_tool_#{kind.slug}", class: check_class %>
+          <%= render "shared/icon", name: kind.icon, size: 16, class: "text-accent" %>
+          <span class="text-sm text-text-primary"><%= kind.human_name %></span>
+        </label>
+        <%= text_field_tag "user_template[chosen_tools][#{kind.slug}][name]", chosen&.dig("name"),
+              id: "user_template_tool_#{kind.slug}_name", class: "input flex-1", placeholder: kind.human_name,
+              aria: { label: _("Name of %{tool}", tool: kind.human_name) } %>
+      </div>
+    <% end %>
+  </fieldset>
+
+  <fieldset class="space-y-3 border-t border-border-light pt-4">
+    <legend class="text-sm font-semibold text-text-primary mb-1"><%= _("Their mailbox") %></legend>
+    <label class="flex items-center gap-3 cursor-pointer">
+      <%= f.check_box :mail, class: check_class %>
+      <span class="text-sm text-text-primary"><%= _("A Mail tool on their own mailbox, on these servers") %></span>
+    </label>
+    <p class="help-text"><%= _("Their username and password are asked for when you make each account.") %></p>
+
+    <div class="hidden group-has-[#user_template_mail:checked]:block space-y-4">
+      <%= render "components/form_field", label: _("Name"), name: "user_template[mail_tool_name]", id: "user_template_mail_tool_name",
+            value: template.mail_tool_name, placeholder: _("Mail") %>
+
+      <h3 class="text-sm font-semibold text-text-primary"><%= _("Incoming mail (IMAP)") %></h3>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="col-span-2">
+          <%= render "components/form_field", label: _("IMAP server"), name: "user_template[mail_imap_host]", id: "user_template_mail_imap_host",
+                value: template.mail_imap_host, placeholder: "imap.example.com", object: template, field: :mail_imap_host %>
+        </div>
+        <%= render "components/form_field", label: _("Port"), name: "user_template[mail_imap_port]", id: "user_template_mail_imap_port",
+              type: :number, value: template.mail_imap_port %>
+      </div>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <%= f.check_box :mail_imap_ssl, class: check_class %>
+        <span class="text-sm text-text-primary"><%= _("Use SSL/TLS") %></span>
+      </label>
+
+      <h3 class="text-sm font-semibold text-text-primary"><%= _("Outgoing mail (SMTP)") %></h3>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="col-span-2">
+          <%= render "components/form_field", label: _("SMTP server"), name: "user_template[mail_smtp_host]", id: "user_template_mail_smtp_host",
+                value: template.mail_smtp_host, placeholder: "smtp.example.com", object: template, field: :mail_smtp_host %>
+        </div>
+        <%= render "components/form_field", label: _("Port"), name: "user_template[mail_smtp_port]", id: "user_template_mail_smtp_port",
+              type: :number, value: template.mail_smtp_port %>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <%= render "components/form_field", label: _("Authentication"), name: "user_template[mail_smtp_auth]", id: "user_template_mail_smtp_auth",
+              type: :select, value: template.mail_smtp_auth,
+              options: [ [ _("Plain"), "plain" ], [ _("Login"), "login" ], [ "CRAM-MD5", "cram_md5" ] ] %>
+        <div class="flex items-end pb-2">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <%= f.check_box :mail_smtp_tls, class: check_class %>
+            <span class="text-sm text-text-primary"><%= _("Use STARTTLS") %></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="space-y-3 border-t border-border-light pt-4">
+    <legend class="text-sm font-semibold text-text-primary mb-1"><%= _("Tools they join") %></legend>
+    <p class="help-text"><%= _("Tools of yours that each new person is added to as a collaborator, without an invitation.") %></p>
+    <%= hidden_field_tag "user_template[shared_tool_ids][]", "", id: nil %>
+    <%# Another admin's tools stay in the template: only they can take them out %>
+    <% (template.shared_tool_ids - my_tools.map(&:id)).each do |id| %>
+      <%= hidden_field_tag "user_template[shared_tool_ids][]", id, id: nil %>
+    <% end %>
+    <% if my_tools.any? %>
+      <% my_tools.each do |tool| %>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <%= check_box_tag "user_template[shared_tool_ids][]", tool.id, template.shared_tool_ids.include?(tool.id),
+                id: "user_template_shared_tool_#{tool.id}", class: check_class %>
+          <%= render "shared/icon", name: tool.tool_type.icon, size: 16, class: "text-accent" %>
+          <span class="text-sm text-text-primary"><%= tool.name %></span>
+        </label>
+      <% end %>
+    <% else %>
+      <p class="text-sm text-text-tertiary"><%= _("You own no tools yet.") %></p>
+    <% end %>
+  </fieldset>
+
+  <div class="flex items-center justify-end gap-3 pt-2">
+    <%= render "components/button", text: _("Cancel"), href: admin_user_templates_path, variant: :secondary %>
+    <%= render "components/button", text: template.persisted? ? _("Save changes") : _("Create template") %>
+  </div>
+<% end %>

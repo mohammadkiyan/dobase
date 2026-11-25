@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_24_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_25_100000) do
   create_table "access_tokens", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "last_used_at"
@@ -726,6 +726,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_24_120000) do
     t.index ["tool_type_id"], name: "index_tools_on_tool_type_id"
   end
 
+  create_table "user_templates", force: :cascade do |t|
+    t.string "name", null: false
+    t.json "tools", default: [], null: false
+    t.json "shared_tool_ids", default: [], null: false
+    t.boolean "mail", default: false, null: false
+    t.string "mail_tool_name"
+    t.string "mail_imap_host"
+    t.integer "mail_imap_port", default: 993
+    t.boolean "mail_imap_ssl", default: true, null: false
+    t.string "mail_smtp_host"
+    t.integer "mail_smtp_port", default: 587
+    t.string "mail_smtp_auth", default: "plain", null: false
+    t.boolean "mail_smtp_tls", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email_address", null: false
@@ -748,6 +765,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_24_120000) do
     t.string "dark_theme_name"
     t.boolean "mcp_enabled", default: true, null: false
     t.string "notification_level", default: "all", null: false
+    t.boolean "admin", default: false, null: false
+    t.boolean "welcome_pending", default: false, null: false
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 

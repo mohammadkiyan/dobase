@@ -1,0 +1,12 @@
+<% content_for :title, _("New template - %{app_name}", app_name: app_name) %>
+<% content_for :page_title, _("New template") %>
+
+<div class="p-6 max-w-2xl space-y-6">
+  <%= render "components/back_link", href: admin_user_templates_path, text: _("Templates") %>
+  <h1 class="text-xl font-semibold text-text-primary"><%= _("New template") %></h1>
+  <div class="card">
+    <div class="card-body">
+      <%= render "admin/user_templates/form", template: @template %>
+    </div>
+  </div>
+</div>
