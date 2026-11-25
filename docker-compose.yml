@@ -11,11 +11,17 @@ services:
       - DISABLE_SSL=${DISABLE_SSL-true}
       - APP_NAME=${APP_NAME:-Dobase}
       - APP_HOST=${APP_HOST:-localhost:3000}
-      - APP_FROM_EMAIL=${APP_FROM_EMAIL:-notifications@dobase.co}
-      - SMTP_ADDRESS=${SMTP_ADDRESS:-}
+      - APP_FROM_EMAIL=${APP_FROM_EMAIL:-notifications@${MAIL_DOMAIN:-dobase.test}}
+      # Dobase's own mail (invitations, notifications) goes out through the mail
+      # server below, from notifications@<MAIL_DOMAIN>, once NOTIFICATIONS_MAIL_PASSWORD
+      # is in .env. To use another server, set the four SMTP_* in .env instead.
+      - SMTP_ADDRESS=${SMTP_ADDRESS:-mailserver}
       - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USERNAME=${SMTP_USERNAME:-}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_USERNAME=${SMTP_USERNAME:-notifications@${MAIL_DOMAIN:-dobase.test}}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-${NOTIFICATIONS_MAIL_PASSWORD:-}}
+      # The mail and calendar servers below are on this private network, which
+      # Dobase refuses unless told otherwise
+      - ALLOW_PRIVATE_NETWORK_HOSTS=${ALLOW_PRIVATE_NETWORK_HOSTS:-true}
       # Optional: uncomment to enable the Room (video) tool.
       # LIVEKIT_URL must be the public URL browsers connect to.
       # - LIVEKIT_URL=wss://room.your-domain.com
@@ -23,6 +29,64 @@ services:
       # - LIVEKIT_API_SECRET=devsecret
     volumes:
       - storage:/rails/storage
+    restart: unless-stopped
+
+  # Mail server: Postfix (SMTP) and Dovecot (IMAP), by docker-mailserver.
+  # A mailbox is made with:
+  #   docker compose exec mailserver setup email add ann@your-domain.com 'password'
+  # In Dobase's Mail tool (or an admin template) it is:
+  #   IMAP mailserver, port 143, SSL off   SMTP mailserver, port 587, PLAIN, TLS off
+  # The login is the whole address. Dobase talks to it inside this network, so
+  # without TLS; only port 25 (mail from other servers) is published. To have
+  # mail from the internet, point your domain's MX record at this machine.
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: mail.${MAIL_DOMAIN:-dobase.test}
+    ports:
+      - "25:25"
+    environment:
+      - SSL_TYPE=
+      - MAIL_DOMAIN=${MAIL_DOMAIN:-dobase.test}
+      - NOTIFICATIONS_MAIL_PASSWORD=${NOTIFICATIONS_MAIL_PASSWORD:-}
+    # Before the server starts: the mailbox Dobase sends its own mail from, when
+    # NOTIFICATIONS_MAIL_PASSWORD is given. The server won't start without any
+    # mailbox, so without one the first start makes postmaster@<domain>, whose
+    # password is written to the log once.
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        accounts=/tmp/docker-mailserver/postfix-accounts.cf
+        if [ -n "$${NOTIFICATIONS_MAIL_PASSWORD}" ] && ! grep -qs "^notifications@$${MAIL_DOMAIN}|" "$${accounts}"; then
+          setup email add "notifications@$${MAIL_DOMAIN}" "$${NOTIFICATIONS_MAIL_PASSWORD}"
+        fi
+        if ! grep -qs '@' "$${accounts}"; then
+          password="$$(head -c 18 /dev/urandom | base64 | tr -d '/+=')"
+          setup email add "postmaster@$${MAIL_DOMAIN}" "$${password}"
+          echo "Made postmaster@$${MAIL_DOMAIN} with the password $${password}"
+        fi
+        exec /usr/bin/dumb-init -- "$$@"
+      - --
+    command: ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-config:/tmp/docker-mailserver
+    stop_grace_period: 1m
+    restart: unless-stopped
+
+  # Calendar server: Radicale (CalDAV). Every mailbox above is a calendar
+  # account too, with the same login, and starts with a calendar of its own.
+  # In Dobase's Calendar tool: CalDAV URL http://calendar:5232/, the mailbox's
+  # address and password. Not published; to reach it from phones, put it
+  # behind a proxy that does TLS.
+  calendar:
+    image: tomsquest/docker-radicale:latest
+    configs:
+      - source: radicale
+        target: /config/config
+    volumes:
+      - calendar-data:/data
     restart: unless-stopped
 
   # Optional: LiveKit server for the Room (video) tool.
@@ -37,5 +101,27 @@ services:
   #     - LIVEKIT_KEYS=devkey:devsecret
   #   restart: unless-stopped
 
+configs:
+  radicale:
+    content: |
+      [server]
+      hosts = 0.0.0.0:5232
+
+      [auth]
+      type = imap
+      imap_host = mailserver:143
+      imap_security = none
+
+      [rights]
+      type = owner_only
+
+      [storage]
+      filesystem_folder = /data/collections
+      predefined_collections = {"calendar": {"tag": "VCALENDAR", "D:displayname": "Calendar", "C:supported-calendar-component-set": "VEVENT,VTODO"}}
+
 volumes:
   storage:
+  mail-data:
+  mail-state:
+  mail-config:
+  calendar-data:

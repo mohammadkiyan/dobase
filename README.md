@@ -136,6 +136,27 @@ docker compose up -d
 
 It answers on `http://localhost:3000`. A fresh key per `up` would sign everyone out on every restart, so leave `SECRET_KEY_BASE` unset (the container keeps its own) or put a fixed one in an `.env` file next to `docker-compose.yml`. Behind a proxy that does TLS, put `DISABLE_SSL=` (empty) in that `.env`: Dobase then insists on https.
 
+It brings a mail server ([docker-mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/): Postfix and Dovecot) and a calendar server ([Radicale](https://radicale.org)) along, for the Mail and Calendar tools:
+
+```bash
+# .env
+MAIL_DOMAIN=your-domain.com
+NOTIFICATIONS_MAIL_PASSWORD=<a password>   # Dobase sends its own mail as notifications@your-domain.com
+```
+
+```bash
+docker compose exec mailserver setup email add ann@your-domain.com 'her password'
+```
+
+That mailbox is also a calendar account with the same login. In Dobase:
+
+| Tool | Settings |
+|------|----------|
+| Mail (or an admin's template) | IMAP `mailserver`, port 143, SSL off; SMTP `mailserver`, port 587, PLAIN, TLS off |
+| Calendar | CalDAV URL `http://calendar:5232/` |
+
+Dobase reaches both inside Docker's network, so without TLS, and is allowed to (`ALLOW_PRIVATE_NETWORK_HOSTS=true`). Only port 25 is published, for mail from other servers: point your domain's MX record at the machine to receive mail from the internet, and give it SPF and DKIM records (`docker compose exec mailserver setup config dkim`) for what it sends to be trusted. Neither server is published for phones or desktop programs; that needs TLS in front of them first.
+
 Or create your own `docker-compose.yml`:
 
 ```yaml
